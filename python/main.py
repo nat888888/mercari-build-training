@@ -65,12 +65,12 @@ def hello():
 class GetItemResponse(BaseModel):
     items: list[str]
 
-@app.get("/items", response_model=GetItemResponse)#デコレーター(FAST API)
-def get_items():#SQLiteの接続も可？
-    items = fetch_all_items()  # DB からアイテムを取得する関数
-    return GetItemResponse(**{"items": [{item.name : item.category for item in items}]})
+# @app.get("/items", response_model=GetItemResponse)#デコレーター(FAST API)
+# def get_items():#SQLiteの接続も可？
+#     items = fetch_all_items()  # DB からアイテムを取得する関数
+#     return GetItemResponse(**{"items": [{item.name : item.category for item in items}]})
 
-def fetch_all_items():
+# def fetch_all_items():
 
 class AddItemResponse(BaseModel):
     message: str
