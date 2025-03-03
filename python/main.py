@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
-import json
 
 
 # Define the path to the images & sqlite3 database
@@ -62,6 +61,16 @@ def hello():
     return HelloResponse(**{"message": "Hello, world!"})
 
 
+class GetItemResponse(BaseModel):
+    items: list[str]
+
+@app.get("/items", response_model=GetItemResponse)#デコレーター(FAST API)
+def get_items():#SQLiteの接続も可？
+    items = fetch_all_items()  # DB からアイテムを取得する関数
+    return GetItemResponse(**{"items": [{item.name : item.category for item in items}]})
+
+def fetch_all_items():
+
 class AddItemResponse(BaseModel):
     message: str
 
@@ -70,17 +79,13 @@ class AddItemResponse(BaseModel):
 @app.post("/items", response_model=AddItemResponse)
 def add_item(
     name: str = Form(...),
-    category: str = Form(...),
     db: sqlite3.Connection = Depends(get_db),
 ):
     if not name:
         raise HTTPException(status_code=400, detail="name is required")
-    if not category:
-        raise HTTPException(status_code=400, detail="category is required")
 
-    insert_item(Item(name=name,category=category))
-    return AddItemResponse(**{"message": f"item received: {name}, category: {category}"})
-
+    insert_item(Item(name=name))
+    return AddItemResponse(**{"message": f"item received: {name}"})
 
 
 # get_image is a handler to return an image for GET /images/{filename} .
@@ -101,21 +106,8 @@ async def get_image(image_name):
 
 class Item(BaseModel):
     name: str
-    category: str#これなに
 
 
 def insert_item(item: Item):
-    with open('items.json') as f:
-        d_update = json.load(f)
-    
-    item_detail = {
-                "name": item.name,
-                "category": item.category
-            }
-    
-    d_update['items'].append(item_detail)
-
-    with open('items.json', 'w') as f:
-        json.dump(d_update, f, indent=2)
-
+    # STEP 4-1: add an implementation to store an item
     pass
