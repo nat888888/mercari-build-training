@@ -61,16 +61,20 @@ class HelloResponse(BaseModel):
 def hello():
     return HelloResponse(**{"message": "Hello, world!"})
 
+class Item(BaseModel):
+    name: str
+    category: str
 
 class GetItemResponse(BaseModel):
-    items: list[str]
+    items: list[Item]
 
-# @app.get("/items", response_model=GetItemResponse)#デコレーター(FAST API)
-# def get_items():#SQLiteの接続も可？
-#     items = fetch_all_items()  # DB からアイテムを取得する関数
-#     return GetItemResponse(**{"items": [{item.name : item.category for item in items}]})
-
-# def fetch_all_items():
+@app.get("/items", response_model=GetItemResponse)#デコレーター(FAST API)
+def get_items():#SQLiteの接続も可？
+    with open('items.json', 'r') as f:
+        item_all = json.load(f)
+        items = item_all.get('items',[])#ようわからん
+    # return GetItemResponse(**{"items": [{item['name'] : item['category'] for item in item_dic}]})
+    return GetItemResponse(items = items)
 
 class AddItemResponse(BaseModel):
     message: str
