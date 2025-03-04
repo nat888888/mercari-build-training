@@ -88,9 +88,20 @@ def get_items():#SQLiteの接続も？
     # return GetItemResponse(**{"items": [{item['name'] : item['category'] for item in item_dic}]})
     return GetItemResponse(items = items)
 
+class GetIDItem(BaseModel):
+    name: str
+    category: str
+    image: str
+
+@app.get('/items/{item_id}', response_model = GetIDItem)
+def get_iditem(item_id: int):
+    with open('items.json', 'r') as f:
+        item_all = json.load(f)
+        items = item_all.get('items',[])
+    return items[int(item_id)-1]
+
 class AddItemResponse(BaseModel):
     message: str
-
 
 # add_item is a handler to add a new item for POST /items .
 @app.post("/items", response_model=AddItemResponse)
