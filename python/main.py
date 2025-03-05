@@ -58,7 +58,7 @@ def save_image(file: UploadFile) -> str:
     content = file.file.read()  # ← 画像のデータを全部読み込む（バイナリデータ(jpgとかtextじゃないデータ)）???
     hashed_name = hashlib.sha256(content).hexdigest()  # ハッシュ化??? hashed-valueが返るの？
     file_name = f"{hashed_name}.jpg"
-    file_path = os.path.join("images", file_name)
+    file_path = images / file_name
 
     with open(file_path, "wb") as f:  # wb = バイナリ書き込み
         f.write(content)
@@ -161,4 +161,3 @@ def insert_item(item: Item):
 
     with open('items.json', 'w') as f:
         json.dump(d_update, f, indent=2)
-    pass
