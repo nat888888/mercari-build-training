@@ -88,17 +88,20 @@ def get_items():#SQLiteの接続も？
     # return GetItemResponse(**{"items": [{item['name'] : item['category'] for item in item_dic}]})
     return GetItemResponse(items = items)
 
-class GetIDItem(BaseModel):
+class GetItemByID(BaseModel):
     name: str
     category: str
     image: str
 
-@app.get('/items/{item_id}', response_model = GetIDItem)
-def get_iditem(item_id: int):
+@app.get('/items/{item_id}', response_model = GetItemByID)
+def get_item_by_id(item_id: int):
     with open('items.json', 'r') as f:
         item_all = json.load(f)
         items = item_all.get('items',[])
-    return items[int(item_id)-1]
+    try: 
+        items[int(item_id)-1]
+    except(IndexError):
+        raise IndexError(f"Invalid item_id: {item_id}. ID must be between 1 and {len(items)}")
 
 class AddItemResponse(BaseModel):
     message: str
@@ -118,10 +121,10 @@ def add_item(
     if not image:
         raise HTTPException(status_code=400, detail="image is required")
     
-    image_name = save_image(image)
+    hashed_image = save_image(image)
 
-    insert_item(Item(name=name,category=category, image_name=image_name))
-    return AddItemResponse(**{"message": f"item received: {name}, category: {category}, image_name: {image_name}"})
+    insert_item(Item(name=name,category=category, hshed_image=hashed_image))
+    return AddItemResponse(**{"message": f"item received: {name}, category: {category}, hashed_image: {hashed_image}"})
 
 
 # get_image is a handler to return an image for GET /images/{filename} .
