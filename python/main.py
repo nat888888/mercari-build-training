@@ -32,13 +32,22 @@ def get_db():
 def setup_database():
     conn = sqlite3.connect(db)
     cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+        )
+    """)
+
     # `items` テーブルを作成（なければ作成）
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_id INTEGER NOT NULL,
             name TEXT NOT NULL,
-            category TEXT NOT NULL,
-            image_name TEXT NOT NULL
+            image_name TEXT NOT NULL,
+            FOREIGN KEY (category_id) REFERENCES categories(id)
         )
     """)
     conn.commit()
@@ -95,7 +104,7 @@ class GetItemResponse(BaseModel):
 @app.get("/items", response_model=GetItemResponse)#デコレーター(FAST API)
 def get_items(db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
-    cursor.execute("SELECT name, category, image_name FROM items")
+    cursor.execute("SELECT items.id, items.name, categories.name AS category, items.image_name FROM items JOIN categories ON items.category_id = categories.id")
     items = [{"name": row[0], "category": row[1], "image_name": row[2]} for row in cursor.fetchall()]
     return GetItemResponse(items=items)
 
@@ -194,7 +203,7 @@ def insert_item(item: Item, db: sqlite3.Connection):
 
 
 class SearchResponse(BaseModel):
-    items:List[Item]
+    items:List[Item] #複数のitemsを返すからリストじゃないといけない
 
 @app.get('/search', response_model = SearchResponse)
 def search_items(
