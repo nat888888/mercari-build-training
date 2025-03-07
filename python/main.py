@@ -19,8 +19,7 @@ db = pathlib.Path(__file__).parent.resolve() / "db" / "mercari.sqlite3"
 def get_db():
     if not db.exists():
         yield
-
-    conn = sqlite3.connect(db)
+    conn = sqlite3.connect(db) # データベースに接続
     conn.row_factory = sqlite3.Row  # Return rows as dictionaries
     try:
         yield conn
@@ -30,7 +29,19 @@ def get_db():
 
 # STEP 5-1: set up the database connection
 def setup_database():
-    pass
+    conn = sqlite3.connect(db)
+    cursor = conn.cursor()
+    # `items` テーブルを作成（なければ作成）
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            image_name TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 
 @asynccontextmanager
@@ -81,12 +92,17 @@ class GetItemResponse(BaseModel):
     items: list[Item]
 
 @app.get("/items", response_model=GetItemResponse)#デコレーター(FAST API)
-def get_items():#SQLiteの接続も？
-    with open('items.json', 'r') as f:
-        item_all = json.load(f)
-        items = item_all.get('items',[])#？？？
-    # return GetItemResponse(**{"items": [{item['name'] : item['category'] for item in item_dic}]})
-    return GetItemResponse(items = items)
+def get_items(db: sqlite3.Connection = Depends(get_db)):
+    cursor = db.cursor()
+    cursor.execute("SELECT name, category, image_name FROM items")
+    items = [{"name": row[0], "category": row[1], "image_name": row[2]} for row in cursor.fetchall()]
+    return GetItemResponse(items=items)
+
+    # <<jsonの場合>>
+    # with open('items.json', 'r') as f:
+    #     item_all = json.load(f)
+    #     items = item_all.get('items',[])#？？？
+    # return GetItemResponse(items = items)
 
 class GetItemByID(BaseModel):
     name: str
@@ -94,14 +110,22 @@ class GetItemByID(BaseModel):
     image: str
 
 @app.get('/items/{item_id}', response_model = GetItemByID)
-def get_item_by_id(item_id: int):
-    with open('items.json', 'r') as f:
-        item_all = json.load(f)
-        items = item_all.get('items',[])
-    try: 
-        items[int(item_id)-1]
-    except(IndexError):
-        raise IndexError(f"Invalid item_id: {item_id}. ID must be between 1 and {len(items)}")
+def get_item_by_id(item_id: int, db: sqlite3.Connection = Depends(get_db)):
+    cursor = db.cursor()
+    cursor.execute("SELECT name, category, image_name FROM items WHERE id = ?", (item_id,)) # SQLインジェクションを防ぐ
+    item = cursor.fetchone()
+    if not item:
+        raise HTTPException(status_code=404, detail=f"Item with id: {item_id} not found")
+    return GetItemByID(name=item[0], category=item[1], image=item[2])
+
+    # <<jsonの場合>>
+    # with open('items.json', 'r') as f:
+    #     item_all = json.load(f)
+    #     items = item_all.get('items',[])
+    # try: 
+    #     items[int(item_id)-1]
+    # except(IndexError):
+    #     raise IndexError(f"Invalid item_id: {item_id}. ID must be between 1 and {len(items)}")
 
 class AddItemResponse(BaseModel):
     message: str
@@ -114,16 +138,12 @@ def add_item(
     image: UploadFile = File(...), #ファイルとして受け取る
     db: sqlite3.Connection = Depends(get_db),
 ):
-    if not name:
-        raise HTTPException(status_code=400, detail="name is required")
-    if not category:
-        raise HTTPException(status_code=400, detail="category is required")
-    if not image:
-        raise HTTPException(status_code=400, detail="image is required")
+    if not name or not category or not image:
+        raise HTTPException(status_code=400, detail="All fields are required")
     
     hashed_image = save_image(image)
 
-    insert_item(Item(name=name,category=category, hshed_image=hashed_image))
+    insert_item(Item(name=name,category=category, image_name=hashed_image), db)
     return AddItemResponse(**{"message": f"item received: {name}, category: {category}, hashed_image: {hashed_image}"})
 
 
@@ -149,18 +169,24 @@ class Item(BaseModel):
     image_name: str
 
 
-def insert_item(item: Item):
+def insert_item(item: Item, db: sqlite3.Connection):
+    # <<jsonの場合>>
     # STEP 4-1: add an implementation to store an item
-    with open('items.json') as f:
-        d_update = json.load(f)
+    # with open('items.json') as f:
+    #     d_update = json.load(f)
+    # item_detail = {
+    #             "name": item.name,
+    #             "category": item.category,
+    #             "image": item.image_name
+    #         }
+    # d_update['items'].append(item_detail)
 
-    item_detail = {
-                "name": item.name,
-                "category": item.category,
-                "image": item.image_name
-            }
+    # with open('items.json', 'w') as f:
+    #     json.dump(d_update, f, indent=2)
 
-    d_update['items'].append(item_detail)
-
-    with open('items.json', 'w') as f:
-        json.dump(d_update, f, indent=2)
+    cursor = db.cursor()
+    cursor.execute(
+        "INSERT INTO items (name, category, image_name) VALUES (?, ?, ?)",
+        (item.name, item.category, item.image_name)
+    )
+    db.commit()
