@@ -1,7 +1,7 @@
 import os
 import logging
 import pathlib
-from fastapi import FastAPI, Form, HTTPException, Depends, UploadFile, File
+from fastapi import FastAPI, Form, HTTPException, Depends, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import json
 import hashlib
+from typing import List
 
 
 # Define the path to the images & sqlite3 database
@@ -190,3 +191,19 @@ def insert_item(item: Item, db: sqlite3.Connection):
         (item.name, item.category, item.image_name)
     )
     db.commit()
+
+
+class SearchResponse(BaseModel):
+    items:List[Item]
+
+@app.get('/search', response_model = SearchResponse)
+def search_items(
+        keyword: str = Query(...,min_length=1, description='Search keyword'),
+        db: sqlite3.Connection = Depends(get_db),
+):
+    cursor = db.cursor()
+    cursor.execute("SELECT name, category, image_name FROM items WHERE name LIKE ?", (f"%{keyword}%",)) # '%'はなに
+    rows = cursor.fetchall()
+    cursor.close()
+    items = [Item(name=row["name"], category=row["category"], image_name=row["image_name"]) for row in rows]
+    return SearchResponse(items=items)
