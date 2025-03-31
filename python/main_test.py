@@ -76,46 +76,32 @@ def test_hello(want_status_code, want_body):
     [
         ({"name":"used iPhone 16e", "category":"phone"}, 200),
         ({"name":"", "category":"phone"}, 400),
+        ({"name":"used iPhone 16e", "category":""}, 400),
     ],
 )
 def test_add_item_e2e(args,want_status_code,db_connection):
-    cursor = db_connection.cursor()
-
-    # ✅ 1. カテゴリーを追加して `category_id` を取得
-    cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", (args["category"],))
-    cursor.execute("SELECT id FROM categories WHERE name = ?", (args["category"],))
-    category_row = cursor.fetchone()
-    assert category_row is not None, "Category not found in database"
-    category_id = category_row["id"]
-
-    # ✅ 2. `args` の `category` を `category_id` に変換
-    new_args = args.copy()
-    new_args["category_id"] = category_id
-    del new_args["category"]  # `category` は main.py に渡す必要がないため削除
-
-    # ✅ 3. アイテムを登録
-    with open("test_image.jpg", "rb") as image_file:
-        files = {"image": ("test_image.jpg", image_file, "image/jpeg")}
-        response = client.post("/items/", data=new_args, files=files)
-
+    with open("images/default.jpg", "rb") as file:
+        files = {"image": ("default.jpg", file, "image/jpeg")}
+        response = client.post("/items/", data=args, files = files)
     assert response.status_code == want_status_code
+    
 
     if want_status_code >= 400:
         return
+        
+    # Check if the response body is correct
+    response_data = response.json()
+    assert "message" in response_data
 
-    # ✅ 4. DBに正しく登録されたか確認
-    cursor.execute("SELECT * FROM items WHERE name = ? AND category_id = ?", (args["name"], category_id))
+    # Check if the data was saved to the database correctly
+    cursor = db_connection.cursor()
+    cursor.execute("SELECT * FROM items WHERE name = ?", (args["name"],))
     db_item = cursor.fetchone()
     assert db_item is not None
-    assert dict(db_item)["name"] == args["name"]
-        
-    # # Check if the response body is correct
-    # response_data = response.json()
-    # assert "message" in response_data
 
-    # # Check if the data was saved to the database correctly
-    # cursor = db_connection.cursor()
-    # cursor.execute("SELECT * FROM items WHERE name = ?", (args["name"],))
-    # db_item = cursor.fetchone()
-    # assert db_item is not None
-    # assert dict(db_item)["name"] == args["name"]
+    db_item_dict = dict(db_item) #データを辞書式に変換
+    assert dict(db_item)["name"] == args["name"]
+
+    #categoryがある場合のみチェック
+    if "category" in db_item_dict:
+        assert db_item_dict["category"] == args["category"]
