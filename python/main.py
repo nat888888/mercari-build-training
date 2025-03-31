@@ -105,7 +105,7 @@ class GetItemResponse(BaseModel):
 def get_items(db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
     cursor.execute("SELECT items.id, items.name, categories.name AS category, items.image_name FROM items JOIN categories ON items.category_id = categories.id")
-    items = [{"name": row[0], "category": row[1], "image_name": row[2]} for row in cursor.fetchall()]
+    items = [{"name": row[1], "category": row[2], "image_name": row[3]} for row in cursor.fetchall()]
     return GetItemResponse(items=items)
 
     # <<jsonの場合>>
