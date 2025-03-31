@@ -180,7 +180,7 @@ class Item(BaseModel):
 
 
 def insert_item(item: Item, db: sqlite3.Connection):
-    # <<jsonの場合>>
+# <<jsonの場合>>
     # STEP 4-1: add an implementation to store an item
     # with open('items.json') as f:
     #     d_update = json.load(f)
@@ -195,9 +195,21 @@ def insert_item(item: Item, db: sqlite3.Connection):
     #     json.dump(d_update, f, indent=2)
 
     cursor = db.cursor()
+    # categories テーブルにカテゴリが存在するか確認
+    cursor.execute("SELECT id FROM categories WHERE name = ?", (item.category,))
+    category_row = cursor.fetchone()
+
+    if category_row:
+        category_id = category_row["id"]
+    else:
+        # カテゴリが存在しない場合、新しく追加
+        cursor.execute("INSERT INTO categories (name) VALUES (?)", (item.category,))
+        category_id = cursor.lastrowid  # 追加したカテゴリの ID を取得
+    
+
     cursor.execute(
-        "INSERT INTO items (name, category, image_name) VALUES (?, ?, ?)",
-        (item.name, item.category, item.image_name)
+        "INSERT INTO items (name, category_id, image_name) VALUES (?, ?, ?)",
+        (item.name, category_id, item.image_name)
     )
     db.commit()
 
@@ -211,7 +223,7 @@ def search_items(
         db: sqlite3.Connection = Depends(get_db),
 ):
     cursor = db.cursor()
-    cursor.execute("SELECT name, category, image_name FROM items WHERE name LIKE ?", (f"%{keyword}%",)) # '%'はなに
+    cursor.execute("SELECT name, category, image_name FROM items WHERE name LIKE ?", (f"%{keyword}%",)) 
     rows = cursor.fetchall()
     cursor.close()
     items = [Item(name=row["name"], category=row["category"], image_name=row["image_name"]) for row in rows]
